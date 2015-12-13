@@ -1,0 +1,36 @@
+{% extends "generic_page.html" %}
+
+{% block title %}Авторизация{% endblock %}
+
+{% block body %}
+  <h1>Авторизация</h1>
+  <p>Для приложения <b>{{client_name}}</b></p>
+  <form method="POST">
+    {% if state is not none %}
+        <input name="state" type="hidden" value="{{state}}">
+    {% endif %}
+    <input name="client_id" type="hidden" value="{{client_id}}">
+    <table>
+      <tbody>
+        <tr>
+          <td style="text-align:right">Логин:</td>
+          <td>
+            <input name="login" pattern="^[A-Za-z]([-_]?[A-Za-z0-9]+)*$">
+          </td>
+        </tr>  
+        <tr>
+          <td style="text-align:right">Пароль:</td>
+          <td>
+            <input name="password" type="password" pattern="^.{6,}$">
+          </td>
+        </tr>  
+        <tr>
+          <td></td>
+          <td style="text-align:right">
+            <input type="submit" value="Вход">
+          </td>
+        </tr>  
+      </tbody>
+    </table>
+  </form>
+{% endblock  %}
