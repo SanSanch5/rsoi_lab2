@@ -28,15 +28,15 @@ if user.exists():
 else:
     user.create('login', 'password_hash', 'name', 'email', 'phone')
 
-food = Base('db/food.pdl')
-if food.exists():
-    food.open()
+clothes = Base('db/clothes.pdl')
+if clothes.exists():
+    clothes.open()
 else:
-    food.create('name', 'price')
+    clothes.create('name', 'price')
 
 order = Base('db/order.pdl')
 if order.exists():
     order.open()
 else:
-    order.create('user_id', 'food', 'delivery_location', 'time_placed', 'time_delivered')
+    order.create('user_id', 'clothes', 'delivery_location', 'time_placed', 'time_delivered')
 

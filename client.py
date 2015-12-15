@@ -3,22 +3,19 @@ from flask import Flask, redirect, request
 import requests
 import requests.auth
 
-import pprint
 application = Flask(__name__)
 
-redirect_uri = r"http://127.0.0.1:5000/auth"
-
-
-def dump(v):
-    pp = pprint.PrettyPrinter(indent=4)
-    pp.pprint(v)
+redirect_uri = r"http://127.0.0.1:8000/auth"
+client_id = '7'
+secret_key = '6f2d7909690b927fc0aeebdaf8931bb81b2a758dcaa692d781417838eea61102'
+access_token = None
 
 
 @application.route("/")
 def index():
-    url = 'http://127.0.0.1:8000/oauth/authcode?'
+    url = 'http://127.0.0.1:5000/oauth/authcode?'
     url += 'response_type=code'
-    url += '&client_id=1234'
+    url += '&client_id=' + client_id
     url += '&redirect_uri=' + redirect_uri
     return redirect(url)
 
@@ -37,14 +34,15 @@ def auth():
     if code is None:
         return "bad request"
 
-    print("code = " + code)
-
-    auth = requests.auth.HTTPBasicAuth('1234', '5678')
-    url = r'http://127.0.0.1:8000/oauth/token'
-    #code = "5609fcaf7e7a496341a3c62e1e457a6d"
-    params = {'grant_type': 'authorization_code', 'code': code, 'redirect_uri': redirect_uri}
-    #params = {'grant_type': 'refresh_token', 'refresh_token': "b5391af49652eb235c28fbc09a72601d"}
-    response = requests.post(url=url, auth=auth, data=params)
+    auth = requests.auth.HTTPBasicAuth(client_id, secret_key)
+    url = r'http://127.0.0.1:5000/oauth/token'
+    params = {'grant_type': 'authorization_code',
+              'code': code,
+              'redirect_uri': redirect_uri,
+              'client_id': client_id,
+              'client_secret': secret_key,
+              }
+    response = requests.post(url=url, data=params)
 
     print(response.text)
 
@@ -52,7 +50,7 @@ def auth():
         return "request error: " + response.text
 
     access_token = response.json()["access_token"]
-    url = r'http://127.0.0.1:8000/me'
+    url = r'http://127.0.0.1:5000/me'
     headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + access_token}
 
     response = requests.get(url=url, headers=headers)
@@ -62,6 +60,6 @@ def auth():
     return response.text
 
 if __name__ == "__main__":
-    application.run(threaded=True)
+    application.run(port=8000, threaded=True)
 
 

@@ -15,11 +15,30 @@ def index():
     return redirect(url_for('register_form'))
 
 
+@app.route('/regapp', methods=['GET'])
+def register_default_app():
+    secret_key = sha256(str(uuid4()).encode('UTF-8')).hexdigest()
+    _redirect = request.args.get('redirect_uri')
+    _name = request.args.get('name')
+    res = db.client.insert(secret=secret_key,
+                           redirect_uri=_redirect,
+                           name=_name)
+    db.client.commit()
+    return json.dumps({
+        'client_id': res,
+        'secret_key': secret_key,
+    }), 200, {
+               'Content-Type': 'application/json;charset=UTF-8',
+               'Cache-Control': 'no-store',
+               'Pragma': 'no-cache',
+    }
+
+
 @app.route('/register', methods=['GET'])
 def register_form():
     return render_template('register_form.html')
 
-    
+
 @app.route('/register', methods=['POST'])
 def register():
     login = request.form['login']
@@ -35,7 +54,8 @@ def register():
     phone = request.form['phone'] or None
 
     if db.user(login=login):
-        return render_template('register_fail.html', reason='Пользователь с таким логином уже существует.'.format(login))
+        return render_template('register_fail.html',
+                               reason='Пользователь с таким логином уже существует.'.format(login))
 
     db.user.insert(login=login,
                    password_hash=sha256(password.encode('UTF-8')).digest(),
@@ -47,52 +67,56 @@ def register():
     return render_template('register_ok.html', login=request.form['login'])
 
 
-@app.route('/oauth/authorize', methods=['GET'])
+@app.route('/oauth/authcode', methods=['GET'])
 def authorize_form():
     response_type = request.args.get('response_type', None)
     client_id = request.args.get('client_id', None)
     state = request.args.get('state', None)
 
     if client_id is None:
-        return render_template('authorize_fail.html', reason='Require client_id.')
+        return render_template('authorize_fail.html', reason='Передайте client_id.')
     try:
         client_id = int(client_id)
     except:
         client_id = None
     if client_id not in db.client:
-        return render_template('authorize_fail.html', reason='client_id is invalid.')
+        return render_template('authorize_fail.html', reason='Приложение с заданным client_id не зарегистрировано.')
 
     if response_type is None:
         return redirect(db.client[client_id]['redirect_uri'] + '?error=invalid_request' +
-                                                              ('' if state is None else '&state=' + state), code=302)
+                        ('' if state is None else '&state=' + state), code=302)
     if response_type != 'code':
         return redirect(db.client[client_id]['redirect_uri'] + '?error=unsupported_response_type' +
-                                                              ('' if state is None else '&state=' + state), code=302)
+                        ('' if state is None else '&state=' + state), code=302)
 
     return render_template('authorize_form.html', state=state,
-                                                  client_id=client_id,
-                                                  client_name=db.client[client_id]['name'])
+                           client_id=client_id,
+                           client_name=db.client[client_id]['name'])
 
 
-@app.route('/oauth/authorize', methods=['POST'])
+@app.route('/oauth/authcode', methods=['POST'])
 def authorize():
     client_id = int(request.form.get('client_id'))
     login = request.form.get('login')
     password = request.form.get('password')
     state = request.form.get('state', None)
 
+    uri = db.client[client_id]['redirect_uri']
     if not db.user(login=login):
-        return redirect(db.client[client_id]['redirect_uri'] + '?error=access_denied' + ('' if state is None else '&state=' + state), code=302)
+        return redirect(uri + '?error=access_denied' + (
+        '' if state is None else '&state=' + state), code=302)
     if db.user(login=login)[0]['password_hash'] != sha256(password.encode('UTF-8')).digest():
-        return redirect(db.client[client_id]['redirect_uri'] + '?error=access_denied' + ('' if state is None else '&state=' + state), code=302)
+        return redirect(uri + '?error=access_denied' + (
+        '' if state is None else '&state=' + state), code=302)
 
-    code=sha256(str(uuid4()).encode('UTF-8')).hexdigest()
+    code = sha256(str(uuid4()).encode('UTF-8')).hexdigest()
     db.authorization_code.insert(user_id=db.user(login=login)[0]['__id__'],
                                  code=code,
                                  expire_time=datetime.now() + timedelta(minutes=10))
     db.authorization_code.commit()
 
-    return redirect(db.client[client_id]['redirect_uri'] + '?code=' + code + ('' if state is None else '&state=' + state), code=302)
+    return redirect(
+        uri + '?code=' + code + ('' if state is None else '&state=' + state), code=302)
 
 
 @app.route('/oauth/token', methods=['POST'])
@@ -103,16 +127,17 @@ def token():
         client_secret = request.form.get('client_secret')
     except KeyError:
         return json.dumps({'error': 'invalid_request'}), 400, {
-            'Content-Type': 'application/json;charset=UTF-8',        
+            'Content-Type': 'application/json;charset=UTF-8',
         }
 
     try:
         client_id = int(client_id)
     except:
         client_id = None
+    print(client_id, client_secret, db.client[client_id]['secret'])
     if client_id not in db.client or db.client[client_id]['secret'] != client_secret:
         return json.dumps({'error': 'invalid_client'}), 400, {
-            'Content-Type': 'application/json;charset=UTF-8',        
+            'Content-Type': 'application/json;charset=UTF-8',
         }
 
     if grant_type == 'authorization_code':
@@ -120,12 +145,12 @@ def token():
             code = request.form.get('code')
         except KeyError:
             return json.dumps({'error': 'invalid_request'}), 400, {
-                'Content-Type': 'application/json;charset=UTF-8',        
+                'Content-Type': 'application/json;charset=UTF-8',
             }
 
         if not db.authorization_code(code=code) or db.authorization_code(code=code)[0]['expire_time'] < datetime.now():
             return json.dumps({'error': 'invalid_grant'}), 400, {
-                'Content-Type': 'application/json;charset=UTF-8',        
+                'Content-Type': 'application/json;charset=UTF-8',
             }
 
         user_id = db.authorization_code(code=code)[0]['user_id']
@@ -137,12 +162,12 @@ def token():
             refresh_token = request.form.get('refresh_token')
         except KeyError:
             return json.dumps({'error': 'invalid_request'}), 400, {
-                'Content-Type': 'application/json;charset=UTF-8',        
+                'Content-Type': 'application/json;charset=UTF-8',
             }
 
         if not db.token(refresh=refresh_token):
             return json.dumps({'error': 'invalid_grant'}), 400, {
-                'Content-Type': 'application/json;charset=UTF-8',        
+                'Content-Type': 'application/json;charset=UTF-8',
             }
 
         user_id = db.token(refresh=refresh_token)[0]['user_id']
@@ -151,7 +176,7 @@ def token():
         db.token.commit()
     else:
         return json.dumps({'error': 'unsupported_grant_type'}), 400, {
-            'Content-Type': 'application/json;charset=UTF-8',        
+            'Content-Type': 'application/json;charset=UTF-8',
         }
 
     access_token = sha256(str(uuid4()).encode('UTF-8')).hexdigest()
@@ -169,70 +194,70 @@ def token():
         'expires_in': 3600,
         'refresh_token': refresh_token,
     }), 200, {
-        'Content-Type': 'application/json;charset=UTF-8',        
-        'Cache-Control': 'no-store',
-        'Pragma': 'no-cache',
+               'Content-Type': 'application/json;charset=UTF-8',
+               'Cache-Control': 'no-store',
+               'Pragma': 'no-cache',
     }
 
 
-@app.route('/food/', methods=['GET'])
-def get_food():
+@app.route('/clothes/', methods=['GET'])
+def get_clothes():
     try:
         per_page = int(request.args.get('per_page', 20))
         if per_page < 20 or per_page > 100:
             raise Exception()
         page = int(request.args.get('page', 0))
-        if page < 0 or page > len(db.food) // per_page:
+        if page < 0 or page > len(db.clothes) // per_page:
             raise Exception()
     except:
         return '', 400
 
     items = []
-    for i, food in enumerate(db.food):
+    for i, clothes in enumerate(db.clothes):
         if i < page * per_page:
             continue
         if i >= (page + 1) * per_page:
             break
         items.append({
-            'id': food['__id__'],
-            'name': food['name'],
-            'price': food['price'],
+            'id': clothes['__id__'],
+            'name': clothes['name'],
+            'price': clothes['price'],
         })
 
     return json.dumps({
         'items': items,
         'per_page': per_page,
         'page': page,
-        'page_count': math.ceil(len(db.food) / per_page)
+        'page_count': math.ceil(len(db.clothes) / per_page)
     }, indent=4), 200, {
-        'Content-Type': 'application/json;charset=UTF-8',        
+               'Content-Type': 'application/json;charset=UTF-8',
     }
 
 
-@app.route('/food/<id>', methods=['GET'])
-def get_food_item(id):
+@app.route('/clothes/<id>', methods=['GET'])
+def get_clothes_item(id):
     try:
         id = int(id)
-        if id not in db.food:
+        if id not in db.clothes:
             raise Exception()
     except:
         return '', 404
 
-    food = db.food[id]
+    clothes = db.clothes[id]
     return json.dumps({
-        'id': food['__id__'],
-        'name': food['name'],
-        'price': food['price'],
+        'id': clothes['__id__'],
+        'name': clothes['name'],
+        'price': clothes['price'],
     }, indent=4), 200, {
-        'Content-Type': 'application/json;charset=UTF-8',        
-    }
+               'Content-Type': 'application/json;charset=UTF-8',
+           }
 
 
 @app.route('/me', methods=['GET'])
 def get_me():
     access_token = request.headers.get('Authorization', '')[len('Bearer '):]
     if not db.token(access=access_token) or db.token(access=access_token)[0]['expire_time'] < datetime.now():
-        return '', 403 
+        return '', 403
 
     user_id = db.token(access=access_token)[0]['user_id']
 
@@ -242,7 +267,7 @@ def get_me():
         'email': db.user[user_id]['email'],
         'phone': db.user[user_id]['phone'],
     }, indent=4), 200, {
-        'Content-Type': 'application/json;charset=UTF-8',        
+               'Content-Type': 'application/json;charset=UTF-8',
     }
 
 
@@ -250,7 +275,7 @@ def get_me():
 def get_orders():
     access_token = request.headers.get('Authorization', '')[len('Bearer '):]
     if not db.token(access=access_token) or db.token(access=access_token)[0]['expire_time'] < datetime.now():
-        return '', 403 
+        return '', 403
 
     user_id = db.token(access=access_token)[0]['user_id']
 
@@ -272,7 +297,7 @@ def get_orders():
             break
         items.append({
             'id': order['__id__'],
-            'food': order['food'],
+            'clothes': order['clothes'],
             'delivery_location': order['delivery_location'],
             'time_placed': order['time_placed'].isoformat(),
             'time_delivered': None if order['time_delivered'] is None else order['time_delivered'].isoformat(),
@@ -284,7 +309,7 @@ def get_orders():
         'page': page,
         'page_count': math.ceil(len(db.order) / per_page)
     }, indent=4), 200, {
-        'Content-Type': 'application/json;charset=UTF-8',        
+               'Content-Type': 'application/json;charset=UTF-8',
     }
 
 
@@ -306,13 +331,13 @@ def get_orders_item(id):
     order = db.order[id]
     return json.dumps({
         'id': order['__id__'],
-        'food': order['food'],
+        'clothes': order['clothes'],
         'delivery_location': order['delivery_location'],
         'time_placed': order['time_placed'].isoformat(),
         'time_delivered': None if order['time_delivered'] is None else order['time_delivered'].isoformat(),
     }, indent=4), 200, {
-        'Content-Type': 'application/json;charset=UTF-8',        
-    }
+               'Content-Type': 'application/json;charset=UTF-8',
+           }
 
 
 @app.route('/orders/', methods=['POST'])
@@ -325,8 +350,8 @@ def post_orders():
 
     try:
         order = request.json
-        for food in order['food']:
-            if food['id'] not in db.food or 'amount' not in food:
+        for clothes in order['clothes']:
+            if clothes['id'] not in db.clothes:
                 raise Exception()
         if 'delivery_location' not in order:
             raise Exception()
@@ -334,7 +359,7 @@ def post_orders():
         return '', 400
 
     id = db.order.insert(user_id=user_id,
-                         food=order['food'],
+                         clothes=order['clothes'],
                          delivery_location=order['delivery_location'],
                          time_placed=datetime.now())
     db.order.commit()
@@ -382,17 +407,17 @@ def put_order_item(id):
 
     try:
         order = request.json
-        for food in order['food']:
-            if food['id'] not in db.food or 'amount' not in food:
+        for clothes in order['clothes']:
+            if clothes['id'] not in db.clothes:
                 raise Exception()
         if 'delivery_location' not in order:
             raise Exception()
     except:
         return '', 400
 
-    db.order.update(db.order[id], food=order['food'],
-                                  delivery_location=order['delivery_location'],
-                                  time_placed=datetime.now())
+    db.order.update(db.order[id], clothes=order['clothes'],
+                    delivery_location=order['delivery_location'],
+                    time_placed=datetime.now())
     db.order.commit()
 
     return '', 200
