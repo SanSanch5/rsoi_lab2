@@ -49,7 +49,7 @@ def auth():
     if response.status_code/100 != 2:
         return "request error: " + response.text
 
-    access_token = response.json()["access_token"]
+    access_token = response.json()
     url = r'http://127.0.0.1:5000/me'
     headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + access_token}
 

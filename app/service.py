@@ -15,7 +15,7 @@ def index():
     return redirect(url_for('register_form'))
 
 
-@app.route('/regapp', methods=['GET'])
+@app.route('/regapp', methods=['POST'])
 def register_default_app():
     secret_key = sha256(str(uuid4()).encode('UTF-8')).hexdigest()
     _redirect = request.args.get('redirect_uri')
@@ -207,7 +207,7 @@ def get_clothes():
         if per_page < 20 or per_page > 100:
             raise Exception()
         page = int(request.args.get('page', 0))
-        if page < 0 or page > len(db.clothes) // per_page:
+        if page < 0 or page >= len(db.clothes) // per_page:
             raise Exception()
     except:
         return '', 400
