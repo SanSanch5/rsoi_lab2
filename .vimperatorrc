@@ -1,2 +1,0 @@
-nnoremap <C-H> :tabprevious<CR>
-nnoremap <C-L> :tabnext<CR>
