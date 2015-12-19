@@ -2,6 +2,7 @@
 from flask import Flask, redirect, request
 import requests
 import requests.auth
+import json
 
 application = Flask(__name__)
 
@@ -50,8 +51,10 @@ def auth():
         return "request error: " + response.text
 
     access_token = response.json()
+    with open('authorization.json', 'w') as of:
+        json.dump(access_token, of, indent=4)
     url = r'http://127.0.0.1:5000/me'
-    headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + access_token}
+    headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + access_token['access_token']}
 
     response = requests.get(url=url, headers=headers)
     if response.status_code/100 != 2:

@@ -1,12 +1,5 @@
 curl --data "name=test_app&redirect_uri=some_redirect_uri" localhost:5000/regapp	 # POST
-curl --data @body.json -H "Authorization: Bearer 13301bc98a05cf322a9db646c6967962de9ea9f70893c8ebfcb8909e0191fb56" localhost:5000/orders/
-curl -v -X PUT -H "Authorization Bearer: " localhost:5000/orders/1
-curl -v -X DELETE -H "Authorization Bearer: " localhost:5000/orders/1
-curl localhost:5000/clothes/
+curl -v -H "Authorization: Bearer " -H "Content-Type: application/json" --data @body.json localhost:5000/orders/
+curl -v -X PUT -H "Authorization: Bearer " -H "Content-Type: application/json" -d @body.json localhost:5000/orders/0
+curl -v -X DELETE -H "Authorization: Bearer " localhost:5000/orders/0
 
-{
-    'expires_in': 3600,
-    'access_token': '13301bc98a05cf322a9db646c6967962de9ea9f70893c8ebfcb8909e0191fb56',
-    'token_type': 'bearer',
-    'refresh_token': 'd89a24bb16f692208958020ccf3543eef1384e44d55154c8afc74aeb30980c5f'
-}

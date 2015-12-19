@@ -1,1 +1,11 @@
-{"clothes":"test_clothes","delivery_location":"test_location"}
+{
+  "clothes": [
+    {
+      "id": 0
+    },
+    {
+      "id": 1
+    }
+  ],
+  "delivery_location":"test_location"
+}
