@@ -10,6 +10,7 @@ redirect_uri = r"http://127.0.0.1:8000/auth"
 client_id = '7'
 secret_key = '6f2d7909690b927fc0aeebdaf8931bb81b2a758dcaa692d781417838eea61102'
 access_token = None
+refresh_token = None
 
 
 @application.route("/")
@@ -55,6 +56,35 @@ def auth():
         json.dump(access_token, of, indent=4)
     url = r'http://127.0.0.1:5000/me'
     headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + access_token['access_token']}
+    global refresh_token
+    refresh_token = access_token['refresh_token']
+
+    response = requests.get(url=url, headers=headers)
+    if response.status_code/100 != 2:
+        return "request error: " + response.text
+
+    return response.text
+
+
+@application.route("/refresh")
+def refresh():
+    url = r'http://127.0.0.1:5000/oauth/token'
+    params = {'grant_type': 'refresh_token',
+              'refresh_token': refresh_token,
+              'redirect_uri': redirect_uri,
+              'client_id': client_id,
+              'client_secret': secret_key,
+              }
+    response = requests.post(url=url, data=params)
+
+    print(response.text)
+
+    if response.status_code/100 != 2:
+        return "request error: " + response.text
+
+    access_token = response.json()['access_token']
+    url = r'http://127.0.0.1:5000/me'
+    headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + access_token}
 
     response = requests.get(url=url, headers=headers)
     if response.status_code/100 != 2:

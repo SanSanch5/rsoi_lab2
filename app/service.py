@@ -180,7 +180,8 @@ def token():
         }
 
     access_token = sha256(str(uuid4()).encode('UTF-8')).hexdigest()
-    expire_time = datetime.now() + timedelta(hours=1)
+    # expire_time = datetime.now() + timedelta(hours=1)
+    expire_time = datetime.now() + timedelta(minutes=1)
     refresh_token = sha256(str(uuid4()).encode('UTF-8')).hexdigest()
     db.token.insert(user_id=user_id,
                     access=access_token,
